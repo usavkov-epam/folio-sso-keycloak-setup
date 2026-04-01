@@ -4,15 +4,20 @@
   "description": "Fast setup keycloak to initialize infrastructure for SSO Login on FOLIO",
   "author": "Yury Saukou <yury_saukou@epam.com>",
   "type": "module",
+  "bin": {
+    "folio-sso-keycloak-setup": "./bin/setup.js"
+  },
   "scripts": {
     "build": "tsc",
-    "setup": "npm run build && node dist/src/setup-sso.js"
+    "setup": "npm run build && node dist/src/setup-sso.js",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "26.5.6",
     "commander": "14.0.3",
     "dotenv": "17.3.1",
-    "picocolors": "1.1.1"
+    "picocolors": "1.1.1",
+    "tsx": "4.21.0"
   },
   "devDependencies": {
     "typescript": "6.0.2",
