@@ -15,9 +15,11 @@ if (!fs.existsSync(entry)) {
   process.exit(1);
 }
 
+const args = process.argv.slice(2);
+
 const child = spawn(
   process.execPath,
-  ['--import', 'tsx', entry],
+  ['--import', 'tsx', entry, ...args],
   {
     stdio: 'inherit',
     cwd: repoRoot,

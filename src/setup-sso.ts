@@ -1,9 +1,19 @@
-import KeycloakAdminClient from '@keycloak/keycloak-admin-client';
 import { Command } from 'commander';
 import dotenv from 'dotenv';
 import pc from 'picocolors';
 
 import config from '../foliosso.config.js';
+import {
+  validateConfig,
+  authenticateKeycloak,
+  createIdpRealm,
+  createSamlClient,
+  configureAuthFlow,
+  createSamlBroker,
+  createTestUsers,
+  printSummary,
+  type SetupContext,
+} from './steps/index.js';
 
 const program = new Command();
 
@@ -11,8 +21,26 @@ program
   .name('folio-sso')
   .description('Folio SSO Setup Tool - creates service provider and broker in consortium')
   .version('1.0.0')
-  .option('-e, --env <path>', 'path to .env file', '.env')
+  .option('-e, --env <path>', 'path to .env file (default: .env)', '.env')
+  .option('-k, --keycloak-url <url>', 'Keycloak base URL (or use KEYCLOAK_URL env var)')
+  .option('--idp-realm <realm>', 'Identity Provider realm name (or use IDENTITY_PROVIDER_REALM env var)')
+  .option('--sp-realm <realm>', 'Service Provider realm name (or use SERVICE_PROVIDER_REALM env var)')
   .option('--skip-users', 'skip creating test users', false)
+  .option('-u, --username <username>', 'Keycloak admin username (or use ADMIN_USERNAME env var)')
+  .option('-p, --password <password>', 'Keycloak admin password (or use ADMIN_PASSWORD env var)')
+  .addHelpText('after', `
+Examples:
+  $ folio-sso -k https://keycloak.example.com -u admin -p password --idp-realm idp --sp-realm sp
+  $ folio-sso --keycloak-url https://keycloak.example.com --username admin --password password --skip-users
+  $ KEYCLOAK_URL=https://keycloak.example.com ADMIN_USERNAME=admin ADMIN_PASSWORD=password folio-sso
+  
+Environment Variables:
+  KEYCLOAK_URL                    Keycloak base URL
+  IDENTITY_PROVIDER_REALM         IdP realm name (default: self-saml-idp-realm)
+  SERVICE_PROVIDER_REALM          SP realm name (default: consortium)
+  ADMIN_USERNAME                  Admin username for authentication
+  ADMIN_PASSWORD                  Admin password for authentication
+`)
   .parse(process.argv);
 
 const options = program.opts();
@@ -20,139 +48,58 @@ const options = program.opts();
 async function main() {
   console.log(pc.bold(pc.cyan('🚀 Folio SSO Setup Tool v1.0.0')));
 
+  // Load environment file
   if (options.env !== '.env') {
     dotenv.config({ path: options.env });
   }
 
+  // Prepare configuration
   const idpClientConfig = config.idp.client;
+  const keycloakUrl = options.keycloakUrl || process.env.KEYCLOAK_URL || config.baseUrl;
+  const idpRealm = options.idpRealm || process.env.IDENTITY_PROVIDER_REALM || config.idpRealm;
+  const spRealm = options.spRealm || process.env.SERVICE_PROVIDER_REALM || config.spRealm;
+  const adminUsername = options.username || process.env.ADMIN_USERNAME;
+  const adminPassword = options.password || process.env.ADMIN_PASSWORD;
 
-  const kc = new KeycloakAdminClient({
-    baseUrl: config.baseUrl,
-    realmName: config.masterRealm,
-  });
+  // Step 1: Validate configuration
+  console.log(pc.gray('\n📋 Step 1/7: Validating configuration...'));
+  const setupConfig = validateConfig(keycloakUrl, idpRealm, spRealm, adminUsername, adminPassword);
+  setupConfig.skipUsers = options.skipUsers;
 
-  console.log(pc.blue('🔑 Authenticating to Keycloak...'));
-  await kc.auth({
-    username: process.env.ADMIN_USERNAME!,
-    password: process.env.ADMIN_PASSWORD!,
-    grantType: 'password',
-    clientId: 'admin-cli',
-  });
-  console.log(pc.green('✅ Authenticated'));
+  // Update client config with the provided keycloak URL
+  idpClientConfig.webOrigins = [keycloakUrl];
 
-  // 1. Create IdP Realm
-  console.log(pc.blue(`🌍 Processing IdP Realm: ${config.idpRealm}`));
-  try {
-    await kc.realms.create({
-      realm: config.idpRealm,
-      enabled: true,
-    });
-    console.log(pc.green(`✅ Realm ${config.idpRealm} created`));
-  } catch (e: any) {
-    if (e.response?.status === 409) {
-      console.log(pc.blue(`ℹ️ Realm ${config.idpRealm} already exists`));
-    } else throw e;
-  }
+  // Step 2: Authenticate to Keycloak
+  console.log(pc.gray('\n🔐 Step 2/7: Authenticating to Keycloak...'));
+  const kc = await authenticateKeycloak(keycloakUrl, adminUsername, adminPassword, config.masterRealm);
 
-  // 2. SAML Client
-  console.log(pc.blue('🔗 Setting up SAML Client in Service Provider realm...'));
-  try {
-    await kc.clients.create({
-      realm: config.idpRealm,
-      ...idpClientConfig,
-    });
-    console.log(pc.green('✅ SAML Client created'));
-  } catch (e: any) {
-    if (e.response?.status === 409) {
-      const existing = await kc.clients.find({
-        realm: config.idpRealm,
-        clientId: idpClientConfig.clientId,
-      });
-      if (existing[0]?.id) {
-        await kc.clients.update({
-          realm: config.idpRealm,
-          id: existing[0].id,
-        }, idpClientConfig);
-        console.log(pc.green('✅ SAML Client updated'));
-      }
-    }
-  }
+  const ctx: SetupContext = {
+    ...setupConfig,
+    kc,
+  };
 
-  // 3. Authorization flows
-  console.log(pc.blue('🔐 Configuring authorization flows...'));
-  const authFlowConfig = config.authFlow.flow;
+  // Step 3: Create IdP Realm
+  console.log(pc.gray('\n🌍 Step 3/7: Creating IdP Realm...'));
+  await createIdpRealm(ctx);
 
-  try {
-    await kc.authenticationManagement.createFlow({
-      realm: config.spRealm,
-      ...authFlowConfig,
-    });
-    console.log(pc.green(`✅ Authentication flow "${authFlowConfig.alias}" created`));
-  } catch (e: any) {
-    if (e.response?.status === 409) {
-      const existingFlows = await kc.authenticationManagement.getFlows({ realm: config.spRealm });
-      const existing = existingFlows.find(f => f.alias === authFlowConfig.alias);
+  // Step 4: Create SAML Client
+  console.log(pc.gray('\n🔗 Step 4/7: Creating SAML Client...'));
+  await createSamlClient(ctx, idpClientConfig);
 
-      if (existing?.id) {
-        await kc.authenticationManagement.updateFlow({
-          realm: config.spRealm,
-          flowId: existing.id,
-        }, authFlowConfig);
-        console.log(pc.green(`✅ Authentication flow "${authFlowConfig.alias}" updated`));
-      }
-    }
-  }
+  // Step 5: Configure Authorization Flow
+  console.log(pc.gray('\n🔐 Step 5/7: Configuring Authorization Flow...'));
+  await configureAuthFlow(ctx, config.authFlow.flow);
 
-  // 4. SAML Broker
-  console.log(pc.blue('🔗 Setting up SAML Broker...'));
-  const brokerPayload = config.sp.idp;
+  // Step 6: Create SAML Broker
+  console.log(pc.gray('\n🔗 Step 6/7: Creating SAML Broker...'));
+  await createSamlBroker(ctx, config.sp.idp);
 
-  try {
-    await kc.identityProviders.create({
-      realm: config.spRealm,
-      ...brokerPayload,
-    });
-    console.log(pc.green('✅ SAML Broker created'));
-  } catch (e: any) {
-    if (e.response?.status === 409) {
-      await kc.identityProviders.update({
-        realm: config.spRealm,
-        alias: config.sp.idp.alias,
-      }, brokerPayload);
-      console.log(pc.green('✅ SAML Broker updated'));
-    }
-  }
+  // Step 7: Create Test Users
+  console.log(pc.gray('\n👤 Step 7/7: Managing Test Users...'));
+  await createTestUsers(ctx, config.testUsers);
 
-  // 5. Test Users
-  if (!options.skipUsers) {
-    console.log(pc.blue('👤 Creating test users...'));
-    for (const user of config.testUsers) {
-      try {
-        await kc.users.create({
-          realm: user.realm,
-          username: user.username,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          enabled: true,
-          credentials: [{ type: 'password', value: user.password, temporary: false }]
-        });
-        console.log(pc.green(`✅ User ${user.username} created`));
-      } catch (e: any) {
-        if (e.response?.status === 409) {
-          console.log(pc.blue(`ℹ️ User ${user.username} already exists`));
-        }
-      }
-    }
-  }
-
-  console.log('\n' + pc.bold(pc.green('🎉 === SETUP COMPLETED SUCCESSFULLY ===')));
-  console.log(pc.cyan(`   IdP Realm     → ${config.idpRealm}`));
-  console.log(pc.cyan(`   SP Realm      → ${config.spRealm}`));
-  console.log(pc.cyan(`   Broker Alias  → ${config.sp.idp.alias}`));
-  console.log(pc.cyan(`   Auth Flow     → ${config.authFlow.flow.alias}`));
-  console.log(pc.cyan(`   Test Users     → ${config.testUsers[0].username} (IdP), ${config.testUsers[1].username} (SP)`));
-  console.log(pc.green('\n   Ready to test "Self SSO Login" button.\n'));
+  // Print Summary
+  printSummary(ctx, config.sp.idp.alias, config.authFlow.flow.alias, config.testUsers);
 }
 
 main().catch((err) => {
