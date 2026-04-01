@@ -6,4 +6,4 @@ export { configureAuthFlow } from './configureAuthFlow.js';
 export { createSamlBroker } from './createSamlBroker.js';
 export { createTestUsers } from './createTestUsers.js';
 export { printSummary } from './printSummary.js';
-export type { SetupConfig, SetupContext } from './types.js';
+export type { SetupConfig, SetupContext, AuthenticationFlow, AuthenticationExecution } from './types.js';

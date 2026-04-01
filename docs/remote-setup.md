@@ -39,6 +39,8 @@ npx usavkov-epam/folio-sso-keycloak-setup \
 | `--password` | `-p` | Admin password | Required |
 | `--idp-realm` | - | IdP realm name | `self-saml-idp-realm` |
 | `--sp-realm` | - | SP realm name | `consortium` |
+| `--test-user` | - | SP test user to mirror in IdP | (optional) |
+| `--test-user-field` | - | Field to use for IdP user (username or email) | `username` |
 | `--skip-users` | - | Skip test users creation | false |
 | `--env` | `-e` | Path to .env file | `.env` |
 | `--help` | `-h` | Show help message | - |
@@ -53,6 +55,9 @@ export ADMIN_USERNAME=admin
 export ADMIN_PASSWORD=your-password
 export IDENTITY_PROVIDER_REALM=idp
 export SERVICE_PROVIDER_REALM=consortium
+
+# Optional: specify test user from SP to mirror in IdP
+export TEST_USER=john
 
 npx usavkov-epam/folio-sso-keycloak-setup
 ```
@@ -76,23 +81,28 @@ npx usavkov-epam/folio-sso-keycloak-setup \
   --skip-users
 ```
 
-### With Custom Realm Names
+### With Test User Mirror (from existing SP user)
 ```bash
 npx usavkov-epam/folio-sso-keycloak-setup \
   -k https://keycloak.example.com \
   -u admin \
   -p SecretPassword \
-  --idp-realm my-idp-realm \
-  --sp-realm my-sp-realm
+  --test-user john
 ```
 
-### With Custom .env File
+**Note:** The mirror user will be created in the IdP realm with:
+- Username: `john` (from the SP user)
+- Password: `john` (automatically set to the username)
+- Email: taken from the SP user (or defaults to username@example.com)
+
+### Using Email as IdP User Identifier
 ```bash
 npx usavkov-epam/folio-sso-keycloak-setup \
   -k https://keycloak.example.com \
   -u admin \
   -p SecretPassword \
-  -e ./custom-config.env
+  --test-user john.doe \
+  --test-user-field email
 ```
 
 ## What Gets Set Up
@@ -103,7 +113,7 @@ The script automatically:
 2. ✅ Creates SAML Client in IdP realm
 3. ✅ Configures Authentication Flow
 4. ✅ Sets up SAML Broker in Service Provider
-5. ✅ Creates test users (optional)
+5. ✅ Creates test user in IdP (mirrors from SP user, password = username)
 
 ## Troubleshooting
 

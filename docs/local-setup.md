@@ -63,6 +63,32 @@ npm run setup -- \
   --skip-users
 ```
 
+### With Test User Mirror (from existing SP user)
+
+```bash
+npm run setup -- \
+  -k https://keycloak.example.com \
+  -u admin \
+  -p your-password \
+  --test-user john
+```
+
+**Note:** The mirror user will be created in the IdP realm with:
+- Username: `john` (from the SP user)
+- Password: `john` (automatically set to the username)
+- Email: taken from the SP user (or defaults to username@example.com)
+
+### Using Email as IdP User Identifier
+
+```bash
+npm run setup -- \
+  -k https://keycloak.example.com \
+  -u admin \
+  -p your-password \
+  --test-user john.doe \
+  --test-user-field email
+```
+
 ### Show Help
 
 ```bash
@@ -80,6 +106,9 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your-password
 IDENTITY_PROVIDER_REALM=self-saml-idp-realm
 SERVICE_PROVIDER_REALM=consortium
+
+# Optional: specify test user from SP to mirror in IdP
+TEST_USER=john
 EOF
 ```
 
@@ -92,7 +121,7 @@ npm run setup
 Or with specific command line overrides:
 
 ```bash
-npm run setup -- --username different-admin -p different-password
+npm run setup -- --test-user different-user
 ```
 
 ## Available Scripts

@@ -89,6 +89,21 @@ npx usavkov-epam/folio-sso-keycloak-setup \
   --sp-realm my-sp-realm
 ```
 
+### With Test User Mirror (from existing SP user)
+
+```bash
+npx usavkov-epam/folio-sso-keycloak-setup \
+  -k https://keycloak.example.com \
+  -u admin \
+  -p password \
+  --test-user john
+```
+
+**Note:** The mirror user will be created in the IdP realm with:
+- Username: `john` (from the SP user)
+- Password: `john` (automatically set to the username)
+- Email: taken from the SP user (or defaults to username@example.com)
+
 ### Skip Test User Creation
 
 ```bash
@@ -124,6 +139,8 @@ npx usavkov-epam/folio-sso-keycloak-setup --help
 | `-p, --password` | `ADMIN_PASSWORD` | Admin password | ✅ | - |
 | `--idp-realm` | `IDENTITY_PROVIDER_REALM` | IdP realm name | - | `self-saml-idp-realm` |
 | `--sp-realm` | `SERVICE_PROVIDER_REALM` | SP realm name | - | `consortium` |
+| `--test-user` | `TEST_USER` | Test user to mirror from SP (username or email) | - | - |
+| `--test-user-field` | - | Field to query user by: `username` or `email` | - | `username` |
 | `--skip-users` | - | Skip test user creation | - | false |
 | `-e, --env` | - | Path to .env file | - | `.env` |
 | `-h, --help` | - | Show help message | - | - |

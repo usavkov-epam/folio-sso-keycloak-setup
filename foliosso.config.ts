@@ -1,3 +1,4 @@
+import { Command } from 'commander';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -12,7 +13,8 @@ const {
   SERVICE_PROVIDER_REALM = 'consortium',
 } = process.env;
 
-export default {
+// Static config
+const defaultConfig = {
   baseUrl: KEYCLOAK_URL,
   masterRealm: MASTER_REALM,
   idpRealm: IDENTITY_PROVIDER_REALM,
@@ -142,43 +144,91 @@ export default {
       providerId: "basic-flow",
       topLevel: true,
       builtIn: false,
-      authenticationExecutions: [
-        {
-          authenticator: "idp-detect-existing-broker-user",
-          authenticatorFlow: false,
-          requirement: "REQUIRED",
-          priority: 2,
-          autheticatorFlow: false,
-          userSetupAllowed: false
-        },
-        {
-          authenticatorConfig: "set_existing",
-          authenticator: "idp-auto-link",
-          authenticatorFlow: false,
-          requirement: "REQUIRED",
-          priority: 3,
-          autheticatorFlow: false,
-          userSetupAllowed: false
-        }
-      ]
-    }
-  },
-  testUsers: [
-    {
-      realm: IDENTITY_PROVIDER_REALM,
-      username: "thunderjet",
-      email: "thunderjet@example.com",
-      firstName: "Test",
-      lastName: "User",
-      password: "thunderjet"
     },
-    {
-      realm: SERVICE_PROVIDER_REALM,
-      username: "thunderjet",
-      email: "thunderjet@example.com",
-      firstName: "Test",
-      lastName: "User",
-      password: "thunderjet"
-    }
-  ],
+    authenticationExecutions: [
+      {
+        authenticator: "idp-detect-existing-broker-user",
+        authenticatorFlow: false,
+        requirement: "REQUIRED",
+        priority: 2,
+        userSetupAllowed: false
+      },
+      {
+        authenticatorConfig: "set_existing",
+        authenticator: "idp-auto-link",
+        authenticatorFlow: false,
+        requirement: "REQUIRED",
+        priority: 3,
+        userSetupAllowed: false
+      }
+    ]
+  },
 };
+
+/**
+ * Build final setup configuration from CLI arguments and environment variables
+ */
+function buildConfig() {
+  const program = new Command();
+
+  program
+    .name('folio-sso')
+    .description('Folio SSO Setup Tool - creates service provider and broker in consortium')
+    .version('1.0.0')
+    .option('-e, --env <path>', 'path to .env file (default: .env)', '.env')
+    .option('-k, --keycloak-url <url>', 'Keycloak base URL (or use KEYCLOAK_URL env var)')
+    .option('--idp-realm <realm>', 'Identity Provider realm name (or use IDENTITY_PROVIDER_REALM env var)')
+    .option('--sp-realm <realm>', 'Service Provider realm name (or use SERVICE_PROVIDER_REALM env var)')
+    .option('--skip-users', 'skip creating test users', false)
+    .option('-u, --username <username>', 'Keycloak admin username (or use ADMIN_USERNAME env var)')
+    .option('-p, --password <password>', 'Keycloak admin password (or use ADMIN_PASSWORD env var)')
+    .option('--test-user <username>', 'SP test user to mirror in IdP (or use TEST_USER env var)')
+    .option('--test-user-field <field>', 'Field to use for IdP user creation (default: username)', 'username')
+    .addHelpText('after', `
+Examples:
+  $ folio-sso -k https://keycloak.example.com -u admin -p password --test-user john
+  $ folio-sso -k https://keycloak.example.com -u admin -p password --test-user john.doe --test-user-field email
+  $ folio-sso --keycloak-url https://keycloak.example.com --username admin --password password --skip-users
+  $ TEST_USER=john folio-sso -k https://keycloak.example.com -u admin -p password
+  
+Environment Variables:
+  KEYCLOAK_URL                    Keycloak base URL
+  IDENTITY_PROVIDER_REALM         IdP realm name (default: self-saml-idp-realm)
+  SERVICE_PROVIDER_REALM          SP realm name (default: consortium)
+  ADMIN_USERNAME                  Admin username for authentication
+  ADMIN_PASSWORD                  Admin password for authentication
+  TEST_USER                       SP test user to mirror in IdP
+`)
+    .parse(process.argv);
+
+  const options = program.opts();
+
+  // Load custom environment file if specified
+  if (options.env !== '.env') {
+    dotenv.config({ path: options.env });
+  }
+
+  // Merge CLI options with environment variables and defaults (no duplication)
+  const finalConfig = {
+    ...defaultConfig,
+    baseUrl: options.keycloakUrl || defaultConfig.baseUrl,
+    idpRealm: options.idpRealm || defaultConfig.idpRealm,
+    spRealm: options.spRealm || defaultConfig.spRealm,
+    adminUsername: options.username || process.env.ADMIN_USERNAME,
+    adminPassword: options.password || process.env.ADMIN_PASSWORD,
+    testUserName: options.testUser || process.env.TEST_USER,
+    testUserField: options.testUserField,
+    skipUsers: options.skipUsers,
+  };
+
+  // Update dynamic values that depend on CLI-overridable parameters
+  const finalKeycloakUrl = finalConfig.baseUrl;
+  const finalIdpRealm = finalConfig.idpRealm;
+
+  finalConfig.idp.client.webOrigins = [finalKeycloakUrl];
+  finalConfig.sp.idp.config.singleSignOnServiceUrl = `${finalKeycloakUrl}/realms/${finalIdpRealm}/protocol/saml`;
+
+  return finalConfig;
+}
+
+export default buildConfig();

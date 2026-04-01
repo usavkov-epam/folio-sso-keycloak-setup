@@ -5,7 +5,7 @@ export function printSummary(
   ctx: SetupContext,
   brokerAlias: string,
   authFlowAlias: string,
-  testUsers: any[]
+  testUserName?: string
 ): void {
   const { idpRealm, spRealm } = ctx;
 
@@ -14,6 +14,10 @@ export function printSummary(
   console.log(pc.cyan(`   SP Realm      → ${spRealm}`));
   console.log(pc.cyan(`   Broker Alias  → ${brokerAlias}`));
   console.log(pc.cyan(`   Auth Flow     → ${authFlowAlias}`));
-  console.log(pc.cyan(`   Test Users    → ${testUsers[0].username} (IdP), ${testUsers[1].username} (SP)`));
+  
+  if (testUserName) {
+    console.log(pc.cyan(`   Test User     → "${testUserName}" (mirrored in IdP)`));
+  }
+  
   console.log(pc.green('\n   Ready to test "Self SSO Login" button.\n'));
 }

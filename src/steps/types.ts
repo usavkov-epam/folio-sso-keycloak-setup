@@ -12,3 +12,20 @@ export interface SetupConfig {
 export interface SetupContext extends SetupConfig {
   kc: KeycloakAdminClient;
 }
+
+export interface AuthenticationFlow {
+  alias: string;
+  description: string;
+  providerId: string;
+  topLevel: boolean;
+  builtIn: boolean;
+}
+
+export interface AuthenticationExecution {
+  authenticator: string;
+  authenticatorFlow: boolean;
+  requirement: string;
+  priority: number;
+  userSetupAllowed: boolean;
+  authenticatorConfig?: string;
+}
