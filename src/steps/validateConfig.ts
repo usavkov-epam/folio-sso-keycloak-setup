@@ -1,6 +1,29 @@
 import pc from 'picocolors';
 import type { SetupConfig } from './types.js';
 
+/**
+ * Sanitize and normalize input values
+ */
+function sanitizeInput(input: string, fieldName: string, isUrl: boolean = false): string {
+  if (!input) return input;
+
+  let sanitized = input.trim();
+
+  if (isUrl) {
+    // Remove trailing slashes for URLs
+    sanitized = sanitized.replace(/\/+$/, '');
+    // Ensure URL starts with http:// or https://
+    if (!sanitized.match(/^https?:\/\//)) {
+      console.warn(pc.yellow(`⚠️ Warning: ${fieldName} should start with http:// or https://`));
+    }
+  } else {
+    // For realm names and usernames, remove leading/trailing slashes and special chars
+    sanitized = sanitized.replace(/^\/+|\/+$/g, '');
+  }
+
+  return sanitized;
+}
+
 export function validateConfig(
   keycloakUrl: string | undefined,
   idpRealm: string | undefined,
@@ -35,11 +58,11 @@ export function validateConfig(
   }
 
   return {
-    keycloakUrl,
-    idpRealm,
-    spRealm,
-    adminUsername,
-    adminPassword,
+    keycloakUrl: sanitizeInput(keycloakUrl, 'Keycloak URL', true),
+    idpRealm: sanitizeInput(idpRealm, 'IdP Realm'),
+    spRealm: sanitizeInput(spRealm, 'SP Realm'),
+    adminUsername: sanitizeInput(adminUsername, 'Admin Username'),
+    adminPassword: adminPassword,  // Don't validate password content
     skipUsers: false,
   };
 }

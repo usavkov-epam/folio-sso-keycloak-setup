@@ -63,14 +63,13 @@ async function main() {
   console.log(pc.gray('\n👤 Step 7/7: Managing Test Users...'));
   if (skipUsers) {
     console.log(pc.blue('⏭️ Skipping test users creation'));
-  } else if (testUserName) {
-    await createTestUsers(ctx, spRealm, testUserName, testUserField);
   } else {
-    console.log(pc.blue('ℹ️ No --test-user provided, skipping test user creation'));
+    // Creates test user with provided name or default 'sso-sample-user'
+    await createTestUsers(ctx, spRealm, testUserName, testUserField);
   }
 
   // Print Summary
-  printSummary(ctx, config.sp.idp.alias, config.authFlow.flow.alias, testUserName);
+  printSummary(ctx, config.sp.idp.alias, config.authFlow.flow.alias, testUserName || 'sso-sample-user');
 }
 
 main().catch((err) => {

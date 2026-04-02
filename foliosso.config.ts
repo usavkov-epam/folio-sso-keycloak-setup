@@ -151,6 +151,7 @@ const defaultConfig = {
         authenticatorFlow: false,
         requirement: "REQUIRED",
         priority: 2,
+        autheticatorFlow: false,
         userSetupAllowed: false
       },
       {
@@ -159,6 +160,7 @@ const defaultConfig = {
         authenticatorFlow: false,
         requirement: "REQUIRED",
         priority: 3,
+        autheticatorFlow: false,
         userSetupAllowed: false
       }
     ]
@@ -222,9 +224,11 @@ Environment Variables:
   };
 
   // Update dynamic values that depend on CLI-overridable parameters
-  const finalKeycloakUrl = finalConfig.baseUrl;
+  // Sanitize URL: remove trailing slashes to avoid //
+  const finalKeycloakUrl = finalConfig.baseUrl.replace(/\/+$/, '');
   const finalIdpRealm = finalConfig.idpRealm;
 
+  finalConfig.baseUrl = finalKeycloakUrl;
   finalConfig.idp.client.webOrigins = [finalKeycloakUrl];
   finalConfig.sp.idp.config.singleSignOnServiceUrl = `${finalKeycloakUrl}/realms/${finalIdpRealm}/protocol/saml`;
 
