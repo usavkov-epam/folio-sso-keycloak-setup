@@ -181,6 +181,7 @@ function buildConfig() {
     .option('-k, --keycloak-url <url>', 'Keycloak base URL (or use KEYCLOAK_URL env var)')
     .option('--idp-realm <realm>', 'Identity Provider realm name (or use IDENTITY_PROVIDER_REALM env var)')
     .option('--sp-realm <realm>', 'Service Provider realm name (or use SERVICE_PROVIDER_REALM env var)')
+    .option('--ci', 'skip interactive mode and require all values from CLI or env vars', false)
     .option('--skip-users', 'skip creating test users', false)
     .option('-u, --username <username>', 'Keycloak admin username (or use ADMIN_USERNAME env var)')
     .option('-p, --password <password>', 'Keycloak admin password (or use ADMIN_PASSWORD env var)')
@@ -221,6 +222,7 @@ Environment Variables:
     testUserName: options.testUser || process.env.TEST_USER,
     testUserField: options.testUserField,
     skipUsers: options.skipUsers,
+    ci: options.ci,
   };
 
   // Update dynamic values that depend on CLI-overridable parameters

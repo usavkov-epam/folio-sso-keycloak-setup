@@ -130,6 +130,16 @@ npx usavkov-epam/folio-sso-keycloak-setup
 npx usavkov-epam/folio-sso-keycloak-setup --help
 ```
 
+### Non-CI interactive mode
+
+When you run without `--ci`, setup starts in interactive mode and asks for:
+- Keycloak URL (pre-populated with current config/env value)
+- IdP realm (pre-populated with current config/env value)
+- SP realm (pre-populated with current config/env value)
+- Test user (pre-populated with existing test user or `sso-sample-user`)
+
+If admin user/password are already provided via CLI or env, these are used and not asked again.
+
 ## 🔧 Configuration Options
 
 | Flag | Env Var | Description | Required | Default |
@@ -143,6 +153,7 @@ npx usavkov-epam/folio-sso-keycloak-setup --help
 | `--test-user-field` | - | Field to query user by: `username` or `email` | - | `username` |
 | `--skip-users` | - | Skip test user creation | - | false |
 | `-e, --env` | - | Path to .env file | - | `.env` |
+| `--ci` | - | Non-interactive mode, requires admin credentials | - | false |
 | `-h, --help` | - | Show help message | - | - |
 
 ## 📂 Project Structure

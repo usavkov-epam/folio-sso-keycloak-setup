@@ -1,6 +1,7 @@
 import pc from 'picocolors';
 
 import config from '../foliosso.config.js';
+import { collectConfigInteractive } from './interactive.js';
 import {
   validateConfig,
   authenticateKeycloak,
@@ -17,15 +18,48 @@ async function main() {
   console.log(pc.bold(pc.cyan('🚀 Folio SSO Setup Tool v1.0.0')));
 
   // Configuration is built in foliosso.config.ts from CLI args, env vars, and defaults
-  const keycloakUrl = config.baseUrl;
-  const idpRealm = config.idpRealm;
-  const spRealm = config.spRealm;
-  const adminUsername = config.adminUsername;
-  const adminPassword = config.adminPassword;
-  const testUserName = config.testUserName;
-  const testUserField = config.testUserField;
-  const skipUsers = config.skipUsers;
+  let keycloakUrl = config.baseUrl;
+  let idpRealm = config.idpRealm;
+  let spRealm = config.spRealm;
+  let adminUsername = config.adminUsername;
+  let adminPassword = config.adminPassword;
+  let testUserName = config.testUserName;
+  let testUserField = config.testUserField;
+  let skipUsers = config.skipUsers;
+  const ciMode = Boolean(config.ci);
 
+  if (ciMode) {
+    if (!adminUsername || !adminPassword) {
+      throw new Error('CI mode enabled (--ci) requires admin credentials. Set ADMIN_USERNAME/ADMIN_PASSWORD/env or use -u/-p.');
+    }
+  } else {
+    console.log(pc.yellow('\n⚡ Starting interactive setup (non-CI mode)...\n'));
+    const interactiveConfig = await collectConfigInteractive({
+      keycloakUrl: config.baseUrl,
+      idpRealm: config.idpRealm,
+      spRealm: config.spRealm,
+      testUserName: config.testUserName,
+      skipUsers: config.skipUsers,
+      adminUsername,
+      adminPassword,
+    });
+
+    keycloakUrl = interactiveConfig.keycloakUrl;
+    idpRealm = interactiveConfig.idpRealm;
+    spRealm = interactiveConfig.spRealm;
+    skipUsers = interactiveConfig.skipUsers;
+    testUserName = interactiveConfig.testUserName;
+
+    if (!adminUsername) {
+      adminUsername = interactiveConfig.username;
+    }
+    if (!adminPassword) {
+      adminPassword = interactiveConfig.password;
+    }
+  }
+
+  // Ensure testUserField has a default
+  const testUserFieldValue = testUserField || 'username';
 
   const idpClientConfig = config.idp.client;
 
@@ -65,7 +99,7 @@ async function main() {
     console.log(pc.blue('⏭️ Skipping test users creation'));
   } else {
     // Creates test user with provided name or default 'sso-sample-user'
-    await createTestUsers(ctx, spRealm, testUserName, testUserField);
+    await createTestUsers(ctx, spRealm, testUserName, testUserFieldValue);
   }
 
   // Print Summary
